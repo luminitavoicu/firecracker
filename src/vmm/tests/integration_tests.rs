@@ -36,11 +36,12 @@ use vmm::Vmm;
 use crate::mock_devices::MockSerialInput;
 #[cfg(target_arch = "x86_64")]
 use crate::mock_resources::NOISY_KERNEL_IMAGE;
-use crate::mock_resources::{MockBootSourceConfig, MockVmResources};
+use crate::mock_resources::{MockBootSourceConfig, MockVmConfig, MockVmResources};
 use crate::mock_seccomp::MockSeccomp;
 use crate::test_utils::{restore_stdin, set_panic_hook};
+use vmm::vmm_config::machine_config::VmConfig;
 
-fn default_vmm(_kernel_image: Option<&str>) -> (Arc<Mutex<Vmm>>, EventManager) {
+fn create_vmm(_kernel_image: Option<&str>, is_diff: bool) -> (Arc<Mutex<Vmm>>, EventManager) {
     let mut event_manager = EventManager::new().unwrap();
     let empty_seccomp_filter = get_seccomp_filter(SeccompLevel::None).unwrap();
 
@@ -52,14 +53,32 @@ fn default_vmm(_kernel_image: Option<&str>) -> (Arc<Mutex<Vmm>>, EventManager) {
         Some(kernel) => boot_source_cfg.with_kernel(kernel).into(),
         None => boot_source_cfg.into(),
     };
-    let resources: VmResources = MockVmResources::new()
-        .with_boot_source(boot_source_cfg)
-        .into();
+    let resources: VmResources = match is_diff {
+        true => {
+            let vm_config: VmConfig = MockVmConfig::new().with_dirty_page_tracking().into();
+            MockVmResources::new()
+                .with_boot_source(boot_source_cfg)
+                .with_vm_config(vm_config)
+                .into()
+        }
+        false => MockVmResources::new()
+            .with_boot_source(boot_source_cfg)
+            .into(),
+    };
 
     (
         build_microvm_for_boot(&resources, &mut event_manager, &empty_seccomp_filter).unwrap(),
         event_manager,
     )
+}
+
+fn default_vmm(kernel_image: Option<&str>) -> (Arc<Mutex<Vmm>>, EventManager) {
+    create_vmm(kernel_image, false)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn dirty_tracking_vmm(kernel_image: Option<&str>) -> (Arc<Mutex<Vmm>>, EventManager) {
+    create_vmm(kernel_image, true)
 }
 
 fn wait_vmm_child_process(vmm_pid: i32) {
@@ -258,10 +277,9 @@ fn test_dirty_bitmap_success() {
         0 => {
             set_panic_hook();
 
-            // The vmm will start with dirty page tracking = OFF.
-            let (vmm, _) = default_vmm(Some(NOISY_KERNEL_IMAGE));
+            // The vmm will start with dirty page tracking = ON.
+            let (vmm, _) = dirty_tracking_vmm(Some(NOISY_KERNEL_IMAGE));
 
-            assert!(vmm.lock().unwrap().set_dirty_page_tracking(true).is_ok());
             // Let it churn for a while and dirty some pages...
             thread::sleep(Duration::from_millis(100));
             let bitmap = vmm.lock().unwrap().get_dirty_bitmap().unwrap();
@@ -324,8 +342,7 @@ fn verify_create_snapshot(is_diff: bool) -> (TempFile, TempFile) {
         0 => {
             set_panic_hook();
 
-            let (vmm, _) = default_vmm(Some(NOISY_KERNEL_IMAGE));
-            assert!(vmm.lock().unwrap().set_dirty_page_tracking(true).is_ok());
+            let (vmm, _) = create_vmm(Some(NOISY_KERNEL_IMAGE), is_diff);
 
             // Be sure that the microVM is running.
             thread::sleep(Duration::from_millis(200));
@@ -335,8 +352,8 @@ fn verify_create_snapshot(is_diff: bool) -> (TempFile, TempFile) {
 
             // Create snapshot.
             let snapshot_type = match is_diff {
+                true => SnapshotType::Diff,
                 false => SnapshotType::Full,
-                true => unimplemented!(),
             };
             let snapshot_params = CreateSnapshotParams {
                 snapshot_type,
@@ -434,6 +451,14 @@ fn verify_load_snapshot(snapshot_file: TempFile, memory_file: TempFile) {
 #[cfg(target_arch = "x86_64")]
 #[test]
 fn test_create_and_load_snapshot() {
+    // Create diff snapshot.
+    let (snapshot_file, memory_file) = verify_create_snapshot(true);
+    // Create a new microVm from snapshot. This only tests code-level logic; it verifies
+    // that a microVM can be built with no errors from given snapshot.
+    // It does _not_ verify that the guest is actually restored properly. We're using
+    // python integration tests for that.
+    verify_load_snapshot(snapshot_file, memory_file);
+
     // Create full snapshot.
     let (snapshot_file, memory_file) = verify_create_snapshot(false);
     // Create a new microVm from snapshot. This only tests code-level logic; it verifies
