@@ -24,7 +24,6 @@ import host_tools.proc as proc
 # Checkout the cpuid crate. In the future other
 # differences may appear.
 COVERAGE_DICT = {"Intel": 85.15, "AMD": 84.41}
-PROC_MODEL = proc.proc_type()
 
 COVERAGE_MAX_DELTA = 0.05
 
