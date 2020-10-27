@@ -171,10 +171,14 @@ class SnapshotBuilder:  # pylint: disable=too-few-public-methods
                disks,
                ssh_key: Artifact,
                snapshot_type: SnapshotType = SnapshotType.FULL,
-               target_version: str = None):
+               target_version: str = None,
+               mem_file_name: str = "vm.mem",
+               snapshot_name: str = "vm.vmstate"):
         """Create a Snapshot object from a microvm and artifacts."""
         # Disable API timeout as the APIs for snapshot related procedures
         # take longer.
+        print(mem_file_name + '\n')
+        print(snapshot_name)
         self._microvm.api_session.untime()
         chroot_path = self._microvm.jailer.chroot_path()
         snapshot_dir = os.path.join(chroot_path, "snapshot")
@@ -182,17 +186,18 @@ class SnapshotBuilder:  # pylint: disable=too-few-public-methods
         cmd = 'chown {}:{} {}'.format(self._microvm.jailer.uid,
                                       self._microvm.jailer.gid,
                                       snapshot_dir)
-        utils.run_cmd(cmd)
+        exit_code, _, _ = utils.run_cmd(cmd)
+        assert exit_code == 0
         self._microvm.pause_to_snapshot(
-            mem_file_path="/snapshot/vm.mem",
-            snapshot_path="/snapshot/vm.vmstate",
+            mem_file_path="/snapshot/"+mem_file_name,
+            snapshot_path="/snapshot/"+snapshot_name,
             diff=snapshot_type == SnapshotType.DIFF,
             version=target_version)
 
         # Create a copy of the ssh_key artifact.
         ssh_key_copy = ssh_key.copy()
-        mem_path = os.path.join(snapshot_dir, "vm.mem")
-        vmstate_path = os.path.join(snapshot_dir, "vm.vmstate")
+        mem_path = os.path.join(snapshot_dir, mem_file_name)
+        vmstate_path = os.path.join(snapshot_dir, snapshot_name)
         return Snapshot(mem=mem_path,
                         vmstate=vmstate_path,
                         # TODO: To support more disks we need to figure out a
