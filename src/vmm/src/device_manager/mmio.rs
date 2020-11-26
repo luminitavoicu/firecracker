@@ -314,6 +314,17 @@ impl MMIODeviceManager {
         &self.id_to_dev_info
     }
 
+    #[cfg(target_arch = "x86_64")]
+    /// Gets the number of interrupts used by the devices registered.
+    pub fn get_irq_number(&self) -> usize {
+        let mut irq_number = 0;
+        let _: Result<()> = self.for_each_device(|_, _, device_info, _| {
+            irq_number += device_info.irqs.len();
+            Ok(())
+        });
+        irq_number
+    }
+
     /// Gets the the specified device.
     pub fn get_device(
         &self,

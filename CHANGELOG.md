@@ -18,6 +18,10 @@
   replaced by the `--` separator for extra arguments.
 - Changed the output of the `--version` command line parameter to include a list
   of supported snapshot data format versions for the firecracker binary.
+- The maximum number of virtio devices attached at the same time has increased
+  from 11 to 19, as Firecracker now supports 24 interrupts.
+- Forbid snapshot creation for older versions when the number of attached devices
+  exceeds the old limit.
 
 ### Fixed
 
