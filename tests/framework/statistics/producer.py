@@ -14,6 +14,7 @@ class Producer(ABC):
 
     @abstractmethod
     def produce(self) -> Any:
+        print("prodicer super method")
         """Produce raw results."""
 
 
@@ -95,7 +96,9 @@ class LambdaProducer(Producer):
     # pylint: disable=R1710
     def produce(self) -> Any:
         """Call `self._func`."""
+        print("producer produce")
         if self._func_kwargs:
+            print("producer func has args")
             raw_data = self._func(**self._func_kwargs)
             return raw_data
 

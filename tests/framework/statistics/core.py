@@ -48,15 +48,24 @@ class Core:
 
     def run_exercise(self) -> Statistics:
         """Drive the statistics producers until completion."""
+        print("run exercise")
         iterations = self._statistics['iterations']
+        print("iterations " + str(iterations))
         for tag, pipe in self._pipes.items():
             for iteration in range(iterations):
+                print("inainte sa intre in producer")
                 raw_data = pipe.producer.produce()
+                print("cand ar trebui sa iasa din producer")
+                print(raw_data)
                 if isinstance(raw_data, types.GeneratorType):
+                    print("raw data is instance ")
                     for data in raw_data:
+                        print("inainte de consumer ingest")
                         pipe.consumer.ingest(iteration, data)
+                        print("dupa consumer ingest")
                 else:
                     pipe.consumer.ingest(iteration, raw_data)
+                print("end of iteration")
             try:
                 stats, custom = pipe.consumer.process()
             except Failed as err:
