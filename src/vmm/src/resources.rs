@@ -847,6 +847,7 @@ mod tests {
             net_builder: default_net_builder(),
             mmds_config: None,
             boot_timer: false,
+            debugger: false,
         };
         let mut new_balloon_cfg = BalloonDeviceConfig {
             amount_mb: 100,
@@ -878,6 +879,7 @@ mod tests {
             net_builder: default_net_builder(),
             mmds_config: None,
             boot_timer: false,
+            debugger: false,
         };
         new_balloon_cfg.amount_mb = 256;
         assert!(vm_resources.set_balloon_device(new_balloon_cfg).is_err());
