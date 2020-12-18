@@ -485,3 +485,25 @@ def get_cpu_percent(pid: int, iterations: int, omit: int) -> dict:
                     current_cpu_percentages[thread_name][task_id])
         time.sleep(1)  # 1 second granularity.
     return cpu_percentages
+
+
+def mount_scratch_drives(ssh_connection, scratch_drives):
+    """Mount scratch drives in guest."""
+    for blk in scratch_drives:
+        # Create mount point and mount each device.
+        cmd = "mkdir -p /mnt/{blk} && mount /dev/{blk} /mnt/{blk}".format(
+            blk=blk
+        )
+        exit_code, _, _ = ssh_connection.execute_command(cmd)
+        assert exit_code == 0
+
+        # Create file using dd using O_DIRECT.
+        # After resume we will compute md5sum on these files.
+        dd = "dd if=/dev/zero of=/mnt/{}/test bs=4096 count=10 oflag=direct"
+        exit_code, _, _ = ssh_connection.execute_command(dd.format(blk))
+        assert exit_code == 0
+
+        # Unmount the device.
+        cmd = "umount /dev/{}".format(blk)
+        exit_code, _, _ = ssh_connection.execute_command(cmd)
+        assert exit_code == 0

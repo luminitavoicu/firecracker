@@ -21,6 +21,8 @@ use super::{NUM_QUEUES, QUEUE_SIZE};
 use crate::virtio::persist::{Error as VirtioStateError, VirtioDeviceState};
 use crate::virtio::{DeviceState, TYPE_NET};
 
+use logger::info;
+
 #[derive(Clone, Versionize)]
 // NOTICE: Any changes to this structure require a snapshot version bump.
 pub struct NetConfigSpaceState {
@@ -74,10 +76,13 @@ impl Persist<'_> for Net {
         state: &Self::State,
     ) -> std::result::Result<Self, Self::Error> {
         // RateLimiter::restore() can fail at creating a timerfd.
+        info!("Before rx limiter restore");
         let rx_rate_limiter = RateLimiter::restore((), &state.rx_rate_limiter_state)
             .map_err(Error::CreateRateLimiter)?;
+        info!("Before tx limiter restore");
         let tx_rate_limiter = RateLimiter::restore((), &state.tx_rate_limiter_state)
             .map_err(Error::CreateRateLimiter)?;
+        info!("Before new net");
         let mut net = Net::new_with_tap(
             state.id.clone(),
             state.tap_if_name.clone(),
@@ -88,12 +93,14 @@ impl Persist<'_> for Net {
         )
         .map_err(Error::CreateNet)?;
 
+        info!("Before mmds network stack restore");
         // Safe to unwrap because MmdsNetworkStack::restore() cannot fail.
         net.mmds_ns = state
             .mmds_ns
             .as_ref()
             .map(|mmds_state| MmdsNetworkStack::restore((), &mmds_state).unwrap());
 
+        info!("Before build queues checked");
         net.queues = state
             .virtio_state
             .build_queues_checked(&constructor_args.mem, TYPE_NET, NUM_QUEUES, QUEUE_SIZE)
@@ -113,6 +120,7 @@ impl Persist<'_> for Net {
             net.device_state = DeviceState::Activated(constructor_args.mem);
         }
 
+        info!("end of restore function");
         Ok(net)
     }
 }

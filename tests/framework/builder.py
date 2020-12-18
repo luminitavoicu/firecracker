@@ -92,6 +92,7 @@ class MicrovmBuilder:
 
         with open(config.local_path()) as microvm_config_file:
             microvm_config = json.load(microvm_config_file)
+            print(microvm_config)
 
         response = vm.basic_config(boot_args='console=ttyS0 reboot=k panic=1')
 

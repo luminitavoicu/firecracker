@@ -37,6 +37,8 @@ use utils::terminal::Terminal;
 use utils::time::TimestampUs;
 use vm_memory::{GuestAddress, GuestMemoryMmap};
 
+use logger::info;
+
 /// Errors associated with starting the instance.
 #[derive(Debug)]
 pub enum StartMicrovmError {
@@ -386,6 +388,7 @@ pub fn build_microvm_from_snapshot(
     seccomp_filter: BpfProgramRef,
 ) -> std::result::Result<Arc<Mutex<Vmm>>, StartMicrovmError> {
     use self::StartMicrovmError::*;
+    info!("Start of build from snapshot function");
     let vcpu_count = u8::try_from(microvm_state.vcpu_states.len())
         .map_err(|_| MicrovmStateError::InvalidInput)
         .map_err(RestoreMicrovmState)?;
@@ -416,15 +419,18 @@ pub fn build_microvm_from_snapshot(
         .map_err(RestoreMicrovmState)?;
 
     // Restore devices states.
+    info!("Construct MMIO args");
     let mmio_ctor_args = MMIODevManagerConstructorArgs {
         mem: guest_memory,
         vm: vmm.vm.fd(),
         event_manager,
     };
+    info!("Before restoring devices states");
     vmm.mmio_device_manager =
         MMIODeviceManager::restore(mmio_ctor_args, &microvm_state.device_states)
             .map_err(MicrovmStateError::RestoreDevices)
             .map_err(RestoreMicrovmState)?;
+    info!("After restoring devices states");
 
     // Move vcpus to their own threads and start their state machine in the 'Paused' state.
     vmm.start_vcpus(vcpus, seccomp_filter)
@@ -444,7 +450,7 @@ pub fn build_microvm_from_snapshot(
     SeccompFilter::apply(seccomp_filter.to_vec())
         .map_err(Error::SeccompFilters)
         .map_err(StartMicrovmError::Internal)?;
-
+    info!("End of build from snapshot function");
     Ok(vmm)
 }
 

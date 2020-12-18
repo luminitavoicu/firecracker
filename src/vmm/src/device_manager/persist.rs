@@ -30,6 +30,8 @@ use versionize::{VersionMap, Versionize, VersionizeError, VersionizeResult};
 use versionize_derive::Versionize;
 use vm_memory::GuestMemoryMmap;
 
+use logger::info;
+
 /// Errors for (de)serialization of the MMIO device manager.
 #[derive(Debug)]
 pub enum Error {
@@ -328,6 +330,7 @@ impl<'a> Persist<'a> for MMIODeviceManager {
         }
 
         for block_state in &state.block_devices {
+            info!("Before block restore");
             let device = Arc::new(Mutex::new(
                 Block::restore(
                     BlockConstructorArgs { mem: mem.clone() },
@@ -335,6 +338,7 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 )
                 .map_err(Error::Block)?,
             ));
+            info!("After block restore");
 
             restore_helper(
                 device.clone(),
@@ -344,8 +348,10 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 &block_state.mmio_slot,
                 constructor_args.event_manager,
             )?;
+            info!("After restore helper for device");
         }
         for net_state in &state.net_devices {
+            info!("Before net restore");
             let device = Arc::new(Mutex::new(
                 Net::restore(
                     NetConstructorArgs { mem: mem.clone() },
@@ -353,6 +359,7 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 )
                 .map_err(Error::Net)?,
             ));
+            info!("After net restore");
 
             restore_helper(
                 device.clone(),
@@ -362,8 +369,10 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 &net_state.mmio_slot,
                 constructor_args.event_manager,
             )?;
+            info!("After net restore helper");
         }
         if let Some(vsock_state) = &state.vsock_device {
+            info!("Before vsock restore");
             let ctor_args = VsockUdsConstructorArgs {
                 cid: vsock_state.device_state.frontend.cid,
             };
@@ -388,6 +397,7 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 &vsock_state.mmio_slot,
                 constructor_args.event_manager,
             )?;
+            info!("After vsock restore");
         }
 
         Ok(dev_manager)

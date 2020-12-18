@@ -7,14 +7,17 @@ import logging
 import os
 import platform
 import pytest
+import tempfile
 from conftest import _test_images_s3_bucket, DEFAULT_TEST_IMAGES_S3_BUCKET
-from framework.artifacts import ArtifactCollection, ArtifactSet
+from framework.artifacts import Artifact, ArtifactCollection, ArtifactSet, \
+    ArtifactType, NetIfaceConfig
 from framework.matrix import TestMatrix, TestContext
 from framework.microvms import VMMicro
 from framework.builder import MicrovmBuilder, SnapshotBuilder, SnapshotType
-from framework.utils import CpuMap
-import host_tools.network as net_tools  # pylint: disable=import-error
+from framework.utils import CpuMap, mount_scratch_drives
+import host_tools.drive as drive_tools
 import host_tools.logging as log_tools
+import host_tools.network as net_tools  # pylint: disable=import-error
 
 # How many latencies do we sample per test.
 SAMPLE_COUNT = 3
@@ -63,6 +66,82 @@ LOAD_LATENCY_BASELINES = {
         '2vcpu_512mb.json': 3,
     }
 }
+
+# Define 3 net device configurations.
+net_ifaces = [NetIfaceConfig(),
+              NetIfaceConfig(host_ip="192.168.1.1",
+                             guest_ip="192.168.1.2",
+                             tap_name="tap1",
+                             dev_name="eth1"),
+              NetIfaceConfig(host_ip="192.168.2.1",
+                             guest_ip="192.168.2.2",
+                             tap_name="tap2",
+                             dev_name="eth2"),
+              NetIfaceConfig(host_ip="192.168.3.1",
+                             guest_ip="192.168.3.2",
+                             tap_name="tap3",
+                             dev_name="eth3")]
+# Define 3 scratch drives.
+scratch_drives = ["vdb", "vdc", "vdd"]
+
+'''
+CONFIG = {
+    "2vcpu_128mb" : {
+        "vcpu_count": 2,
+        "mem_size_mib": 128,
+        "ht_enabled": False
+    },
+'''
+CONFIG = {
+    "2vcpu_256mb" : {
+        "vcpu_count": 2,
+        "mem_size_mib": 256,
+        "ht_enabled": False
+    },
+}
+'''
+    "2vcpu_512mb" : {
+        "vcpu_count": 2,
+        "mem_size_mib": 512,
+        "ht_enabled": False
+    },
+    "2vcpu_1024mb" : {
+        "vcpu_count": 2,
+        "mem_size_mib": 1024,
+        "ht_enabled": False
+    },
+    "2vcpu_1536mb" : {
+        "vcpu_count": 2,
+        "mem_size_mib": 1536,
+        "ht_enabled": False
+    },
+    "2vcpu_3008mb" : {
+        "vcpu_count": 2,
+        "mem_size_mib": 3008,
+        "ht_enabled": False
+    },
+    "3vcpu_5307mb" : {
+        "vcpu_count": 3,
+        "mem_size_mib": 5307,
+        "ht_enabled": False
+    },
+    "4vcpu_7076mb" : {
+        "vcpu_count": 4,
+        "mem_size_mib": 7076,
+        "ht_enabled": False
+    },
+    "5vcpu_8845mb" : {
+        "vcpu_count": 4,
+        "mem_size_mib": 8845,
+        "ht_enabled": False
+    },
+    "6vcpu_10240mb" : {
+        "vcpu_count": 6,
+        "mem_size_mib": 10240,
+        "ht_enabled": False
+    },
+}
+'''
 
 
 def _test_snapshot_create_latency(context):
@@ -400,3 +479,102 @@ def test_older_snapshot_resume_latency(bin_cloner_path):
             logger.info("Latency %s/%s: %s ms", i + 1, SAMPLE_COUNT, value)
             assert baseline > value, "LoadSnapshot latency degraded."
             microvm.kill()
+
+
+def test_advanced_snapshot_resume_latency(bin_cloner_path):
+    """Test scenario: Snapshot load performance measurement multiple sizes."""
+    logger = logging.getLogger("snapshot_load")
+
+    artifacts = ArtifactCollection(_test_images_s3_bucket())
+    # Testing matrix:
+    # - Guest kernel: Linux 4.14
+    # - Rootfs: Ubuntu 18.04
+    # - Microvm: multiple sizes configurations found in CONFIG
+    # Pick the first artifact in the set.
+    kernel_artifacts = artifacts.kernels(keyword="4.14")[0]
+    disk_artifacts = artifacts.disks(keyword="ubuntu")
+    kernel_artifacts.download()
+    attached_disks = []
+    for disk in disk_artifacts:
+        disk.download()
+        attached_disks.append(disk.copy())
+
+    microvm_artifacts = []
+    for microvm_config in CONFIG:
+        microvm_artifact = Artifact(None, microvm_config,
+                                    artifact_type=ArtifactType.MICROVM)
+        microvm_artifact.dump_json(CONFIG[microvm_config])
+        microvm_artifacts.append(microvm_artifact)
+
+    vm_builder = MicrovmBuilder(bin_cloner_path)
+
+    # SSH key is attached to root disk artifact.
+    # Builder will download ssh key in the VM root.
+    ssh_key = disk_artifacts[0].ssh_key()
+
+    for microvm_config in microvm_artifacts:
+        logger.info("""Building microvm: \"{}\""""
+                    .format(microvm_config.name()))
+        # Create a fresh microvm from artifacts.
+        basevm = vm_builder.build(kernel=kernel_artifacts,
+                                  disks=attached_disks,
+                                  ssh_key=ssh_key,
+                                  config=microvm_config,
+                                  net_ifaces=net_ifaces)
+
+        disks = [attached_disks[0].local_path()]
+        # Add disks.
+        for scratch in scratch_drives:
+            # Add a scratch 64MB RW non-root block device.
+            scratchdisk = drive_tools.FilesystemFile(tempfile.mktemp(), size=64)
+            basevm.add_drive(scratch, scratchdisk.path)
+            disks.append(scratchdisk.path)
+
+            # Workaround FilesystemFile destructor removal of file.
+            scratchdisk.path = None
+
+        basevm.start()
+
+        # Iterate and validate connectivity on all ifaces after boot.
+        for iface in net_ifaces:
+            basevm.ssh_config['hostname'] = iface.guest_ip
+            ssh_connection = net_tools.SSHConnection(basevm.ssh_config)
+            exit_code, _, _ = ssh_connection.execute_command("sync")
+            assert exit_code == 0
+
+        mount_scratch_drives(ssh_connection, scratch_drives)
+
+        # Create a snapshot builder from a microvm.
+        snapshot_builder = SnapshotBuilder(basevm)
+
+        snapshot = snapshot_builder.create(disks,
+                                           ssh_key,
+                                           snapshot_type=SnapshotType.FULL,
+                                           net_ifaces=net_ifaces)
+        logger.debug("========== Firecracker create snapshot log ==========")
+        logger.debug(basevm.log_data)
+        basevm.kill()
+
+        for i in range(3):
+            microvm, metrics_fifo = vm_builder.build_from_snapshot(snapshot, True)
+
+            # Attempt to connect to resumed microvm.
+            ssh_connection = net_tools.SSHConnection(microvm.ssh_config)
+            # Verify if guest can run commands.
+            exit_code, _, _ = ssh_connection.execute_command("sync")
+            assert exit_code == 0
+
+            value = 0
+            # Parse all metric data points in search of load_snapshot time.
+            metrics = microvm.get_all_metrics(metrics_fifo)
+            for data_point in metrics:
+                metrics = json.loads(data_point)
+                cur_value = metrics['latencies_us']['load_snapshot'] / USEC_IN_MSEC
+                if cur_value > 0:
+                    value = cur_value
+                    break
+            logger.info("Latency: {} ms".format(value))
+            logger.info(microvm.log_data)
+            microvm.kill()
+
+    assert True == False

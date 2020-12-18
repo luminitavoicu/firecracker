@@ -617,7 +617,7 @@ class Microvm:
             is_read_only=is_read_only,
             partuuid=partuuid
         )
-        assert self.api_session.is_status_no_content(response.status_code)
+        assert self.api_session.is_status_no_content(response.status_code), response.text
 
     def patch_drive(self, drive_id, file):
         """Modify/patch an existing block device."""

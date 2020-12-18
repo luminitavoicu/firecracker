@@ -11,6 +11,7 @@ from conftest import _test_images_s3_bucket
 from framework.artifacts import ArtifactCollection, NetIfaceConfig
 from framework.builder import MicrovmBuilder, SnapshotBuilder, SnapshotType
 from framework.microvms import VMNano
+from framework.utils import mount_scratch_drives
 import host_tools.network as net_tools  # pylint: disable=import-error
 import host_tools.drive as drive_tools
 
@@ -225,25 +226,7 @@ def create_snapshot_helper(bin_cloner_path, logger, target_version=None,
         exit_code, _, _ = ssh_connection.execute_command("sync")
         assert exit_code == 0
 
-    # Mount scratch drives in guest.
-    for blk in scratch_drives:
-        # Create mount point and mount each device.
-        cmd = "mkdir -p /mnt/{blk} && mount /dev/{blk} /mnt/{blk}".format(
-            blk=blk
-        )
-        exit_code, _, _ = ssh_connection.execute_command(cmd)
-        assert exit_code == 0
-
-        # Create file using dd using O_DIRECT.
-        # After resume we will compute md5sum on these files.
-        dd = "dd if=/dev/zero of=/mnt/{}/test bs=4096 count=10 oflag=direct"
-        exit_code, _, _ = ssh_connection.execute_command(dd.format(blk))
-        assert exit_code == 0
-
-        # Unmount the device.
-        cmd = "umount /dev/{}".format(blk)
-        exit_code, _, _ = ssh_connection.execute_command(cmd)
-        assert exit_code == 0
+    mount_scratch_drives(ssh_connection, scratch_drives)
 
     # Create a snapshot builder from a microvm.
     snapshot_builder = SnapshotBuilder(vm)

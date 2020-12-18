@@ -8,6 +8,8 @@ use snapshot::Persist;
 use versionize::{VersionMap, Versionize, VersionizeResult};
 use versionize_derive::Versionize;
 
+use logger::info;
+
 /// State for saving a TokenBucket.
 #[derive(Clone, Versionize)]
 // NOTICE: Any changes to this structure require a snapshot version bump.
@@ -72,21 +74,33 @@ impl Persist<'_> for RateLimiter {
     }
 
     fn restore(_: Self::ConstructorArgs, state: &Self::State) -> Result<Self, Self::Error> {
+        info!("Start of rate limiter restore");
         let rate_limiter = RateLimiter {
             ops: if let Some(ops) = state.ops.as_ref() {
+                info!("Before ops");
                 Some(TokenBucket::restore((), ops)?)
             } else {
+                info!("Before ops");
                 None
             },
             bandwidth: if let Some(bw) = state.bandwidth.as_ref() {
+                info!("Before bandwidth");
                 Some(TokenBucket::restore((), bw)?)
             } else {
+                info!("Before bandwidth");
                 None
             },
-            timer_fd: TimerFd::new_custom(ClockId::Monotonic, true, true)?,
-            timer_active: false,
+            timer_fd: {
+                info!("Before timer_fd");
+                TimerFd::new_custom(ClockId::Monotonic, true, true)?
+            },
+            timer_active: {
+                info!("Before timer_active");
+                false
+            },
         };
 
+        info!("End of rate limiter restore");
         Ok(rate_limiter)
     }
 }

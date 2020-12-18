@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Define classes for interacting with CI artifacts in s3."""
 
+import json
 import os
 import platform
 import tempfile
@@ -87,6 +88,16 @@ class Artifact:
         Path(self.local_dir()).mkdir(parents=True, exist_ok=True)
         if force or not os.path.exists(self.local_path()):
             self._bucket.download_file(self._key, self.local_path())
+            # Artifacts are read only by design.
+            os.chmod(self.local_path(), S_IREAD)
+
+    def dump_json(self, json_data, target_folder=ARTIFACTS_LOCAL_ROOT):
+        self._local_folder = target_folder
+        Path(self.local_dir()).mkdir(parents=True, exist_ok=True)
+        if not os.path.exists(self.local_path()):
+            Path(self.local_path()).touch()
+            with open(self.local_path(), 'w') as file:
+                json.dump(json_data, file)
             # Artifacts are read only by design.
             os.chmod(self.local_path(), S_IREAD)
 
