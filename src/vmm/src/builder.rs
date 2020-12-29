@@ -357,6 +357,7 @@ pub fn build_microvm_for_boot(
         &initrd,
         boot_cmdline,
     )?;
+    #[cfg(target_arch = "x86_64")]
     if debugger_enabled {
         let dbg_event_receiver = vcpus[0].dbg_event_receiver.take().unwrap();
         let dbg_event_sender = vcpus[0].dbg_response_sender.take().unwrap();
@@ -857,6 +858,7 @@ fn attach_balloon_device(
     attach_virtio_device(event_manager, vmm, id, balloon.clone(), cmdline)
 }
 
+#[cfg(target_arch = "x86_64")]
 fn vmm_run_gdb_server(
     vmm_mem: GuestMemoryMmap,
     receiver: Receiver<gdb_server::DebugEvent>,

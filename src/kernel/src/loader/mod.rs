@@ -16,8 +16,8 @@ use super::cmdline::Error as CmdlineError;
 use utils::structs::read_struct;
 use vm_memory::{Address, Bytes, GuestAddress, GuestMemory, GuestMemoryMmap};
 
-#[allow(non_camel_case_types)]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+// #[allow(non_camel_case_types)]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64"))]
 // Add here any other architecture that uses as kernel image an ELF file.
 pub mod elf;
 
@@ -265,7 +265,7 @@ pub fn load_cmdline(
 /// * `kernel image` - An object containing the data of a vmlinux kernel binary
 ///
 /// Returns a vector of program header objects
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+// #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub fn extract_phdrs<F>(kernel_image: &mut F) -> Result<Vec<elf::Elf64_Phdr>>
 where
     F: Read + Seek,

@@ -514,6 +514,7 @@ impl Vcpu {
                     }
                 },
                 // Either a breakpoint was reached or we are single-stepping
+                #[cfg(target_arch = "x86_64")]
                 VcpuExit::Debug => {
                     let regular_regs = self.kvm_vcpu.fd.get_regs().unwrap();
                     let special_regs = self.kvm_vcpu.fd.get_sregs().unwrap();

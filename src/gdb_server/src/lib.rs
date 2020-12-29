@@ -1,6 +1,7 @@
 use std::net::{TcpListener, TcpStream};
 
 pub use arch;
+#[cfg(target_arch = "x86_64")]
 pub use arch::x86_64::regs::setup_sregs;
 pub use kernel::loader::elf::{Elf64_Phdr, PT_LOAD};
 pub use kvm_bindings;
@@ -35,6 +36,7 @@ fn wait_for_tcp(port: u16) -> DynResult<TcpStream> {
     Ok(stream)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn run_gdb_server(
     vmm_gm: GuestMemoryMmap,
     entry_addr: GuestAddress,
