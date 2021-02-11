@@ -16,7 +16,7 @@ use std::{
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     thread,
 };
-
+#[allow(unused_imports)]
 use crate::gdb_server::{DebugEvent, FullVcpuState};
 use crate::{
     vmm_config::machine_config::CpuFeaturesTemplate, vstate::vm::Vm, FC_EXIT_CODE_GENERIC_ERROR,
@@ -119,6 +119,7 @@ pub struct Vcpu {
     pub dbg_event_receiver: Option<Receiver<DebugEvent>>,
     // The transmitting end of the responses channel owned by the vcpu side and
     // used to communicate to the gdb server instances
+    #[allow(dead_code)]
     dbg_event_sender: Sender<DebugEvent>,
 
     pub dbg_response_receiver: Receiver<DebugEvent>,

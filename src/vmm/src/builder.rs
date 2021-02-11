@@ -7,7 +7,9 @@ use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::os::unix::io::{AsRawFd, RawFd};
+#[allow(unused_imports)]
 use std::sync::{mpsc::Receiver, mpsc::Sender, Arc, Mutex};
+#[allow(unused_imports)]
 use std::thread;
 
 #[cfg(target_arch = "aarch64")]
@@ -303,7 +305,13 @@ pub fn build_microvm_for_boot(
     )?;
     let vcpu_config = vm_resources.vcpu_config();
     let track_dirty_pages = vm_resources.track_dirty_pages();
-    let (entry_addr, e_phdrs) = load_kernel(boot_config, &guest_memory)?;
+
+    #[cfg(target_arch = "aarch64")]
+        let (entry_addr, _e_phdrs) = load_kernel(boot_config, &guest_memory)?;
+
+    #[cfg(target_arch = "x86_64")]
+        let (entry_addr, e_phdrs) = load_kernel(boot_config, &guest_memory)?;
+
     let initrd = load_initrd_from_config(boot_config, &guest_memory)?;
     // Clone the command-line so that a failed boot doesn't pollute the original.
     #[allow(unused_mut)]
@@ -371,6 +379,11 @@ pub fn build_microvm_for_boot(
         ) {
             return Err(err);
         }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    if debugger_enabled {
+        // do nothing
     }
 
     // Move vcpus to their own threads and start their state machine in the 'Paused' state.
