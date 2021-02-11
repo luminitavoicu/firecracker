@@ -5,7 +5,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the THIRD-PARTY file.
 
+#[allow(unused_imports)]
+use crate::gdb_server::{DebugEvent, FullVcpuState};
+use crate::{
+    vmm_config::machine_config::CpuFeaturesTemplate, vstate::vm::Vm, FC_EXIT_CODE_GENERIC_ERROR,
+    FC_EXIT_CODE_OK,
+};
+use kvm_bindings::{KVM_SYSTEM_EVENT_RESET, KVM_SYSTEM_EVENT_SHUTDOWN};
+use kvm_ioctls::VcpuExit;
 use libc::{c_int, c_void, siginfo_t};
+use logger::{error, info, IncMetric, METRICS};
+use seccomp::{BpfProgram, SeccompFilter};
 #[cfg(not(test))]
 use std::sync::Barrier;
 use std::{
@@ -16,16 +26,6 @@ use std::{
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     thread,
 };
-#[allow(unused_imports)]
-use crate::gdb_server::{DebugEvent, FullVcpuState};
-use crate::{
-    vmm_config::machine_config::CpuFeaturesTemplate, vstate::vm::Vm, FC_EXIT_CODE_GENERIC_ERROR,
-    FC_EXIT_CODE_OK,
-};
-use kvm_bindings::{KVM_SYSTEM_EVENT_RESET, KVM_SYSTEM_EVENT_SHUTDOWN};
-use kvm_ioctls::VcpuExit;
-use logger::{error, info, IncMetric, METRICS};
-use seccomp::{BpfProgram, SeccompFilter};
 use utils::{
     eventfd::EventFd,
     signal::{register_signal_handler, sigrtmin, Killable},
