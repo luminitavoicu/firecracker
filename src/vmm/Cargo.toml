@@ -13,6 +13,7 @@ sysconf = ">=0.3.4"
 versionize = ">=0.1.4"
 versionize_derive = ">=0.1.3"
 vm-memory = { path = "../vm-memory" }
+acpi_tables = { path = "../acpi_tables" }
 arch = { path = "../arch" }
 devices = { path = "../devices" }
 kernel = { path = "../kernel" }
