@@ -110,10 +110,15 @@ pub fn create_acpi_tables(guest_mem: &GuestMemoryMmap, cpu_count: u8) -> GuestAd
     // Revision 6 of the ACPI FADT table is 276 bytes long
     let mut facp = SDT::new(*b"FACP", 276, 6, *b"FIRECR", *b"FCFACP  ", 1);
 
-    facp.write(116, GenericAddress::io_port_address::<u8>(0x3c0));
+    // HW_REDUCED_ACPI
+    let fadt_flags: u32 = 1 << 20;
+    facp.write(112, fadt_flags);
+
     facp.write(131, 3u8); // FADT minor version
     facp.write(140, dsdt_offset.0); // X_DSDT
 
+    // X_PM_TMR_BLK
+    facp.write(208, GenericAddress::io_port_address::<u32>(0xb008));
     facp.write(268, b"FIRECRKR"); // Firecracker Vendor Identity
 
     facp.update_checksum();
