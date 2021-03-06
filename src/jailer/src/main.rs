@@ -31,6 +31,7 @@ pub enum Error {
     Chmod(PathBuf, io::Error),
     CloseNetNsFd(io::Error),
     CloseDevNullFd(io::Error),
+    ClosePipeFd(io::Error),
     Copy(PathBuf, PathBuf, io::Error),
     CreateDir(PathBuf, io::Error),
     CStringParsing(NulError),
@@ -52,8 +53,10 @@ pub enum Error {
     NumaNode(String),
     OpenDevNull(io::Error),
     OsStringParsing(PathBuf, OsString),
+    Pipe(io::Error),
     PivotRoot(io::Error),
     ReadLine(PathBuf, io::Error),
+    ReadToPipe(io::Error),
     ReadToString(PathBuf, io::Error),
     RegEx(regex::Error),
     RmOldRootDir(io::Error),
@@ -64,8 +67,10 @@ pub enum Error {
     UmountOldRoot(io::Error),
     UnexpectedListenerFd(i32),
     UnshareNewNs(io::Error),
+    UnshareNewPID(io::Error),
     UnsetCloexec(io::Error),
     Write(PathBuf, io::Error),
+    WriteToPipe(io::Error),
 }
 
 impl fmt::Display for Error {
@@ -109,6 +114,7 @@ impl fmt::Display for Error {
             ChdirNewRoot(ref err) => write!(f, "Failed to chdir into chroot directory: {}", err),
             CloseNetNsFd(ref err) => write!(f, "Failed to close netns fd: {}", err),
             CloseDevNullFd(ref err) => write!(f, "Failed to close /dev/null fd: {}", err),
+            ClosePipeFd(ref err) => write!(f, "Failed to close pipe fd: {}", err),
             Copy(ref file, ref path, ref err) => write!(
                 f,
                 "{}",
@@ -176,12 +182,14 @@ impl fmt::Display for Error {
                 "{}",
                 format!("Failed to parse path {:?} into an OsString", path).replace("\"", "")
             ),
+            Pipe(ref err) => write!(f, "Failed to create pipe: {}", err),
             PivotRoot(ref err) => write!(f, "Failed to pivot root: {}", err),
             ReadLine(ref path, ref err) => write!(
                 f,
                 "{}",
                 format!("Failed to read line from {:?}: {}", path, err).replace("\"", "")
             ),
+            ReadToPipe(ref err) => write!(f, "Failed to read from the pipe: {}", err),
             ReadToString(ref path, ref err) => write!(
                 f,
                 "{}",
@@ -200,6 +208,9 @@ impl fmt::Display for Error {
             UnshareNewNs(ref err) => {
                 write!(f, "Failed to unshare into new mount namespace: {}", err)
             }
+            UnshareNewPID(ref err) => {
+                write!(f, "Failed to unshare into new PID namespace: {}", err)
+            }
             UnsetCloexec(ref err) => write!(
                 f,
                 "Failed to unset the O_CLOEXEC flag on the socket fd: {}",
@@ -210,6 +221,7 @@ impl fmt::Display for Error {
                 "{}",
                 format!("Failed to write to {:?}: {}", path, err).replace("\"", "")
             ),
+            WriteToPipe(ref err) => write!(f, "Failed to write to the pipe: {}", err),
         }
     }
 }
@@ -265,6 +277,11 @@ pub fn build_arg_parser() -> ArgParser<'static> {
             "Daemonize the jailer before exec, by invoking setsid(), and redirecting \
              the standard I/O file descriptors to /dev/null.",
         ))
+        .arg(
+            Argument::new("new-pid-ns")
+                .takes_value(false)
+                .help("Exec into a new PID namespace."),
+        )
         .arg(Argument::new("cgroup").allow_multiple(true).help(
             "Cgroup and value to be set by the jailer. It must follow this format: \
              <cgroup_file>=<value> (e.g cpu.shares=10). This argument can be used \
@@ -499,6 +516,10 @@ mod tests {
             "Failed to close /dev/null fd: No message of desired type (os error 42)",
         );
         assert_eq!(
+            format!("{}", Error::ClosePipeFd(io::Error::from_raw_os_error(42))),
+            "Failed to close pipe fd: No message of desired type (os error 42)",
+        );
+        assert_eq!(
             format!(
                 "{}",
                 Error::Copy(
@@ -612,6 +633,10 @@ mod tests {
             "Failed to parse path /foo/bar into an OsString",
         );
         assert_eq!(
+            format!("{}", Error::Pipe(io::Error::from_raw_os_error(42))),
+            format!("Failed to create pipe: No message of desired type (os error 42)")
+        );
+        assert_eq!(
             format!("{}", Error::PivotRoot(io::Error::from_raw_os_error(42))),
             "Failed to pivot root: No message of desired type (os error 42)",
         );
@@ -621,6 +646,10 @@ mod tests {
                 Error::ReadLine(file_path.clone(), io::Error::from_raw_os_error(2))
             ),
             format!("Failed to read line from /foo/bar: {}", err2_str)
+        );
+        assert_eq!(
+            format!("{}", Error::ReadToPipe(io::Error::from_raw_os_error(42))),
+            format!("Failed to read from the pipe: No message of desired type (os error 42)")
         );
         assert_eq!(
             format!(
@@ -666,6 +695,10 @@ mod tests {
             "Failed to unshare into new mount namespace: No message of desired type (os error 42)",
         );
         assert_eq!(
+            format!("{}", Error::UnshareNewPID(io::Error::from_raw_os_error(42))),
+            "Failed to unshare into new PID namespace: No message of desired type (os error 42)",
+        );
+        assert_eq!(
             format!("{}", Error::UnsetCloexec(io::Error::from_raw_os_error(42))),
             "Failed to unset the O_CLOEXEC flag on the socket fd: No message of desired type (os \
              error 42)",
@@ -676,6 +709,10 @@ mod tests {
                 Error::Write(file_path, io::Error::from_raw_os_error(2))
             ),
             format!("Failed to write to /foo/bar: {}", err2_str),
+        );
+        assert_eq!(
+            format!("{}", Error::WriteToPipe(io::Error::from_raw_os_error(42))),
+            format!("Failed to write to the pipe: No message of desired type (os error 42)")
         );
     }
 

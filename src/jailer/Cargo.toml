@@ -10,3 +10,4 @@ libc = ">=0.2.39"
 regex = ">=1.0.0"
 
 utils = { path = "../utils" }
+logger = { path = "../logger" }

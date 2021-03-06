@@ -353,6 +353,7 @@ name = "jailer"
 version = "0.24.0"
 dependencies = [
  "libc",
+ "logger",
  "regex",
  "utils",
 ]

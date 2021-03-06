@@ -193,12 +193,19 @@ impl ApiServer {
         }
 
         if let Some(cpu_start_time) = start_time_cpu_us {
-            let delta_us =
-                utils::time::get_time_us(utils::time::ClockType::ProcessCpu) - cpu_start_time + jailer_time_cpu_us.unwrap_or_default();
+            let delta_us = utils::time::get_time_us(utils::time::ClockType::ProcessCpu)
+                - cpu_start_time
+                + jailer_time_cpu_us.unwrap_or_default();
             METRICS
                 .api_server
                 .process_startup_time_cpu_us
                 .store(delta_us as usize);
+            error!(
+                "current time {} provided: {} computed {}",
+                utils::time::get_time_us(utils::time::ClockType::ProcessCpu),
+                cpu_start_time,
+                delta_us
+            );
         }
 
         // Load seccomp filters on the API thread.
