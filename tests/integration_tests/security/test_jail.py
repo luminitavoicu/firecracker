@@ -3,8 +3,11 @@
 """Tests that verify the jailer's behavior."""
 import os
 import stat
+import subprocess
 
+import framework.utils as utils
 from framework.defs import FC_BINARY_NAME
+
 
 # These are the permissions that all files/dirs inside the jailer have.
 REG_PERMS = stat.S_IRUSR | stat.S_IWUSR | \
@@ -15,7 +18,8 @@ FILE_STATS = stat.S_IFREG | REG_PERMS
 SOCK_STATS = stat.S_IFSOCK | REG_PERMS
 # These are the stats of the devices created by tha jailer.
 CHAR_STATS = stat.S_IFCHR | stat.S_IRUSR | stat.S_IWUSR
-
+# Name of the file that stores firecracker's PID.
+PID_FILE_NAME = "firecracker.pid"
 
 def check_stats(filepath, stats, uid, gid):
     """Assert on uid, gid and expected stats for the given path."""
@@ -188,3 +192,38 @@ def test_args_cgroups(test_microvm_with_initrd):
         sys_cgroup,
         test_microvm.jailer.jailer_id
     )
+
+def test_new_pid_namespace(test_microvm_with_ssh):
+    """Test that Firecracker is spawned in a new PID namespace if requested."""
+    test_microvm = test_microvm_with_ssh
+
+    test_microvm.jailer.daemonize = False
+    test_microvm.jailer.new_pid_ns = True
+
+    test_microvm.spawn()
+
+    # Check that the PID file exists.
+    pid_file_path = "{}/{}".format(test_microvm.jailer.chroot_path(), PID_FILE_NAME)
+    assert os.path.exists(pid_file_path)
+
+    # Read the PID stored inside the file.
+    with open(pid_file_path) as f:
+        stored_pid = int(f.readline())
+    f.close()
+
+    # Get the actual PID of the Firecracker process.
+    expected_pid = int(subprocess.check_output("pidof firecracker", shell=True))
+    assert stored_pid == expected_pid
+
+    # Get the thread group IDs in each of the PID namespaces of which
+    # Firecracker process is a member of.
+    NStgid_cmd = "cat /proc/{}/status | grep NStgid".format(expected_pid)
+    NStgid_list = subprocess.check_output(NStgid_cmd, shell=True)\
+                      .decode('utf-8').strip().split("\t")[1:]
+
+    # Check that Firecracker's PID namespace is nested. `NStgid` should
+    # report two values and the last one should be 1, because Firecracker
+    # becomes the init(1) process of the new PID namespace it is spawned in.
+    assert len(NStgid_list) == 2
+    assert int(NStgid_list[1]) == 1
+    assert int(NStgid_list[0]) == expected_pid

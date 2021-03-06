@@ -28,6 +28,8 @@ pub enum Error {
     CgroupFormat(String),
     ChangeFileOwner(PathBuf, io::Error),
     ChdirNewRoot(io::Error),
+    ChildExit,
+    ChildExitStatus(i32),
     Chmod(PathBuf, io::Error),
     CloseNetNsFd(io::Error),
     CloseDevNullFd(io::Error),
@@ -64,6 +66,7 @@ pub enum Error {
     UmountOldRoot(io::Error),
     UnexpectedListenerFd(i32),
     UnshareNewNs(io::Error),
+    UnshareNewPID(io::Error),
     UnsetCloexec(io::Error),
     Write(PathBuf, io::Error),
 }
@@ -107,6 +110,8 @@ impl fmt::Display for Error {
                 write!(f, "Failed to change owner for {:?}: {}", path, err)
             }
             ChdirNewRoot(ref err) => write!(f, "Failed to chdir into chroot directory: {}", err),
+            ChildExit => write!(f, "Child process terminated abnormally"),
+            ChildExitStatus(ref err) => write!(f, "Child process exited with status: {}", err),
             CloseNetNsFd(ref err) => write!(f, "Failed to close netns fd: {}", err),
             CloseDevNullFd(ref err) => write!(f, "Failed to close /dev/null fd: {}", err),
             Copy(ref file, ref path, ref err) => write!(
@@ -200,6 +205,9 @@ impl fmt::Display for Error {
             UnshareNewNs(ref err) => {
                 write!(f, "Failed to unshare into new mount namespace: {}", err)
             }
+            UnshareNewPID(ref err) => {
+                write!(f, "Failed to unshare into new PID namespace: {}", err)
+            }
             UnsetCloexec(ref err) => write!(
                 f,
                 "Failed to unset the O_CLOEXEC flag on the socket fd: {}",
@@ -265,6 +273,11 @@ pub fn build_arg_parser() -> ArgParser<'static> {
             "Daemonize the jailer before exec, by invoking setsid(), and redirecting \
              the standard I/O file descriptors to /dev/null.",
         ))
+        .arg(
+            Argument::new("new-pid-ns")
+                .takes_value(false)
+                .help("Exec into a new PID namespace."),
+        )
         .arg(Argument::new("cgroup").allow_multiple(true).help(
             "Cgroup and value to be set by the jailer. It must follow this format: \
              <cgroup_file>=<value> (e.g cpu.shares=10). This argument can be used \
@@ -488,6 +501,14 @@ mod tests {
             "Failed to chdir into chroot directory: No message of desired type (os error 42)"
         );
         assert_eq!(
+            format!("{}", Error::ChildExit),
+            "Child process terminated abnormally"
+        );
+        assert_eq!(
+            format!("{}", Error::ChildExitStatus(1)),
+            "Child process exited with status: 1"
+        );
+        assert_eq!(
             format!("{}", Error::CloseNetNsFd(io::Error::from_raw_os_error(42))),
             "Failed to close netns fd: No message of desired type (os error 42)",
         );
@@ -664,6 +685,10 @@ mod tests {
         assert_eq!(
             format!("{}", Error::UnshareNewNs(io::Error::from_raw_os_error(42))),
             "Failed to unshare into new mount namespace: No message of desired type (os error 42)",
+        );
+        assert_eq!(
+            format!("{}", Error::UnshareNewPID(io::Error::from_raw_os_error(42))),
+            "Failed to unshare into new PID namespace: No message of desired type (os error 42)",
         );
         assert_eq!(
             format!("{}", Error::UnsetCloexec(io::Error::from_raw_os_error(42))),
