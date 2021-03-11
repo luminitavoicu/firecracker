@@ -206,6 +206,7 @@ class JailerContext:
             else DEFAULT_CHROOT_PATH,
             exist_ok=True
         )
+        utils.run_cmd("cp xvmlinux-4.14.bin /srv/jailer/")
         if self.netns:
             utils.run_cmd('ip netns add {}'.format(self.netns))
 

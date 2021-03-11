@@ -204,7 +204,7 @@ def _g2h_send_ping(context):
             f"Failed to pin fc_vcpu {i} thread."
 
     custom = {"microvm": context.microvm.name(),
-              "kernel": context.kernel.name(),
+              "kernel": "/srv/jailer/xvmlinux-4.14.bin",
               "disk": context.disk.name(),
               "cpu_model_name": get_cpu_model_name()}
 

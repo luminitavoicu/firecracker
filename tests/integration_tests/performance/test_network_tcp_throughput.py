@@ -348,7 +348,7 @@ def iperf_workload(context):
     basevm.start()
     custom = {
         "microvm": context.microvm.name(),
-        "kernel": context.kernel.name(),
+        "kernel": "/srv/jailer/xvmlinux-4.14.bin",
         "disk": context.disk.name(),
         "cpu_model_name": get_cpu_model_name()
     }

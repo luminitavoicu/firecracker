@@ -559,7 +559,9 @@ class Microvm:
             self.memory_monitor.start()
 
         boot_source_args = {
-            'kernel_image_path': self.create_jailed_resource(self.kernel_file),
+            'kernel_image_path': self.create_jailed_resource(
+                '/srv/jailer/xvmlinux-4.14.bin'
+            ),
             'boot_args': boot_args
         }
 

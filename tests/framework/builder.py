@@ -61,7 +61,7 @@ class MicrovmBuilder:
                           self._fc_binary, self._jailer_binary)
 
         # Link the microvm to kernel, rootfs, ssh_key artifacts.
-        vm.kernel_file = kernel.local_path()
+        vm.kernel_file = "/srv/jailer/xvmlinux-4.14.bin"
         vm.rootfs_file = disks[0].local_path()
 
         # Start firecracker.
