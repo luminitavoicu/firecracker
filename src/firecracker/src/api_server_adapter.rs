@@ -127,6 +127,7 @@ pub(crate) fn run_with_api(
     instance_info: InstanceInfo,
     start_time_us: Option<u64>,
     start_time_cpu_us: Option<u64>,
+    jailer_time_cpu_us: Option<u64>,
     boot_timer_enabled: bool,
 ) {
     // FD to notify of API events. This is a blocking eventfd by design.
@@ -162,6 +163,7 @@ pub(crate) fn run_with_api(
                 bind_path,
                 start_time_us,
                 start_time_cpu_us,
+                jailer_time_cpu_us,
                 api_seccomp_filter,
             ) {
                 Ok(_) => (),

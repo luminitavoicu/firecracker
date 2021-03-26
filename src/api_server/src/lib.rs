@@ -157,6 +157,7 @@ impl ApiServer {
     ///             PathBuf::from(api_thread_path_to_socket),
     ///             Some(1),
     ///             Some(1),
+    ///             Some(1),
     ///             SeccompFilter::empty().try_into().unwrap(),
     ///         )
     ///         .unwrap();
@@ -175,6 +176,7 @@ impl ApiServer {
         path: PathBuf,
         start_time_us: Option<u64>,
         start_time_cpu_us: Option<u64>,
+        jailer_time_cpu_us: Option<u64>,
         seccomp_filter: BpfProgram,
     ) -> Result<()> {
         let mut server = HttpServer::new(path).unwrap_or_else(|e| {
@@ -192,7 +194,7 @@ impl ApiServer {
 
         if let Some(cpu_start_time) = start_time_cpu_us {
             let delta_us =
-                utils::time::get_time_us(utils::time::ClockType::ProcessCpu) - cpu_start_time;
+                utils::time::get_time_us(utils::time::ClockType::ProcessCpu) - cpu_start_time + jailer_time_cpu_us.unwrap_or_default();
             METRICS
                 .api_server
                 .process_startup_time_cpu_us
@@ -762,6 +764,7 @@ mod tests {
                 )
                 .bind_and_run(
                     PathBuf::from(api_thread_path_to_socket),
+                    Some(1),
                     Some(1),
                     Some(1),
                     SeccompFilter::empty().try_into().unwrap(),

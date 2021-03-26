@@ -94,6 +94,11 @@ fn main() {
                 .help("Process start CPU time (wall clock, microseconds)."),
         )
         .arg(
+            Argument::new("jailer-time-cpu-us")
+                .takes_value(true)
+                .help("Jailer process CPU time (wall clock, microseconds)."),
+        )
+        .arg(
             Argument::new("config-file")
                 .takes_value(true)
                 .help("Path to a file that contains the microVM configuration in JSON format."),
@@ -234,6 +239,11 @@ fn main() {
             s.parse::<u64>()
                 .expect("'start-time-cpu-us' parameter expected to be of 'u64' type.")
         });
+
+        let jailer_time_cpu_us = arguments.single_value("jailer-time-cpu-us").map(|s| {
+            s.parse::<u64>()
+                .expect("'jailer-time-cpu-us' parameter expected to be of 'u64' type.")
+        });
         api_server_adapter::run_with_api(
             seccomp_filter,
             vmm_config_json,
@@ -241,6 +251,7 @@ fn main() {
             instance_info,
             start_time_us,
             start_time_cpu_us,
+            jailer_time_cpu_us,
             boot_timer_enabled,
         );
     } else {
